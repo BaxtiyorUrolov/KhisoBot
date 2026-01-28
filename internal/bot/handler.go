@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xuri/excelize/v2"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/xuri/excelize/v2"
 	"khisobot/internal/domain"
 	"khisobot/internal/service"
 	"khisobot/pkg/i18n"
