@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xuri/excelize/v2"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/xuri/excelize/v2"
 	"khisobot/internal/domain"
 	"khisobot/internal/service"
 	"khisobot/pkg/i18n"
@@ -33,6 +33,11 @@ const (
 	CallbackDelChannel  = "del_ch_"
 )
 
+const (
+	MandatoryStaticChannelUsername = "khiso"
+	MandatoryStaticChannelURL      = "https://t.me/khiso"
+)
+
 type Handler struct {
 	bot         *tgbotapi.BotAPI
 	userService *service.UserService
@@ -43,7 +48,11 @@ type Handler struct {
 
 	// Admin states (in memory)
 	adminStates map[int64]string
-	mu          sync.RWMutex
+
+	// Subscription confirmed (in memory, NO REAL CHECK)
+	subConfirmed map[int64]bool
+
+	mu sync.RWMutex
 }
 
 func NewHandler(
@@ -55,13 +64,14 @@ func NewHandler(
 	logger *slog.Logger,
 ) *Handler {
 	return &Handler{
-		bot:         bot,
-		userService: userService,
-		otpService:  otpService,
-		adminRepo:   adminRepo,
-		channelRepo: channelRepo,
-		logger:      logger,
-		adminStates: make(map[int64]string),
+		bot:          bot,
+		userService:  userService,
+		otpService:   otpService,
+		adminRepo:    adminRepo,
+		channelRepo:  channelRepo,
+		logger:       logger,
+		adminStates:  make(map[int64]string),
+		subConfirmed: make(map[int64]bool),
 	}
 }
 
@@ -121,12 +131,16 @@ func (h *Handler) handleStart(ctx context.Context, msg *tgbotapi.Message) {
 }
 
 func (h *Handler) checkSubscription(ctx context.Context, userID int64, chatID int64, lang string) bool {
+	// DB kanallarni olamiz (BULAR TEKSHIRILADI)
 	channels, err := h.channelRepo.GetActive(ctx)
 	if err != nil || len(channels) == 0 {
+		// DB kanallar yo'q bo'lsa, blok qilmaymiz
 		return true
 	}
 
 	var notSubscribed []domain.Channel
+
+	// DB kanallarni tekshiramiz (GetChatMember)
 	for _, ch := range channels {
 		member, err := h.bot.GetChatMember(tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
@@ -135,22 +149,33 @@ func (h *Handler) checkSubscription(ctx context.Context, userID int64, chatID in
 				UserID:             userID,
 			},
 		})
+
 		if err != nil || member.Status == "left" || member.Status == "kicked" {
 			notSubscribed = append(notSubscribed, ch)
 		}
 	}
 
+	// Hammasiga obuna bo'lgan -> o'tkazamiz
 	if len(notSubscribed) == 0 {
 		return true
 	}
 
-	// Build keyboard with channel buttons
+	// Keyboard: STATIK kanal (TEKSHIRILMAYDI) + DB dan yetishmayotganlar (TEKSHIRILADI)
 	var rows [][]tgbotapi.InlineKeyboardButton
+
+	// Statik kanalni doim ko'rsatamiz, lekin notSubscribedga kiritmaymiz
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonURL("📢 @"+MandatoryStaticChannelUsername, MandatoryStaticChannelURL),
+	))
+
+	// DB dan topilgan obuna bo'lmagan kanallar
 	for _, ch := range notSubscribed {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("📢 "+ch.ChannelUsername, "https://t.me/"+ch.ChannelUsername),
+			tgbotapi.NewInlineKeyboardButtonURL("📢 @"+ch.ChannelUsername, "https://t.me/"+ch.ChannelUsername),
 		))
 	}
+
+	// Check button
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData(i18n.Get(lang).BtnCheckSub, CallbackCheckSub),
 	))
