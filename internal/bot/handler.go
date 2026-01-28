@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/xuri/excelize/v2"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"khisobot/internal/domain"
 	"khisobot/internal/service"
 	"khisobot/pkg/i18n"
@@ -24,6 +24,7 @@ const (
 	CallbackLogin       = "login"
 	CallbackRegister    = "register"
 	CallbackCheckSub    = "check_sub"
+	CallbackResendOTP   = "resend_otp"
 	CallbackAdminStats  = "admin_stats"
 	CallbackAdminAdd    = "admin_add_channel"
 	CallbackAdminRemove = "admin_remove_channel"
@@ -294,19 +295,28 @@ func (h *Handler) handlePhone(ctx context.Context, msg *tgbotapi.Message, user *
 	h.userService.UpdateUserState(ctx, user.TelegramID, domain.StateWaitOTP)
 
 	maskedPhone := phone[:6] + "****" + phone[len(phone)-2:]
-	h.sendMessageHTML(msg.Chat.ID, fmt.Sprintf(i18n.Get(user.LanguageCode).OTPSent, maskedPhone)+"\n\n"+i18n.Get(user.LanguageCode).AskOTP)
+	h.sendOTPMessage(msg.Chat.ID, user.LanguageCode, maskedPhone)
 }
 
-func (h *Handler) handleOTPInput(ctx context.Context, msg *tgbotapi.Message, user *domain.User, text string) {
+func (h *Handler) handleOTPInput(ctx context.Context, message *tgbotapi.Message, user *domain.User, text string) {
 	currentUser, _ := h.userService.GetUser(ctx, user.TelegramID)
 	if currentUser == nil || currentUser.Phone == "" {
-		h.sendMessage(msg.Chat.ID, i18n.Get(user.LanguageCode).Error)
+		h.sendMessage(message.Chat.ID, i18n.Get(user.LanguageCode).Error)
 		return
 	}
 
 	valid, _ := h.otpService.VerifyOTP(ctx, currentUser.Phone, strings.TrimSpace(text))
 	if !valid {
-		h.sendMessageHTML(msg.Chat.ID, i18n.Get(user.LanguageCode).InvalidOTP+"\n\n"+i18n.Get(user.LanguageCode).ResendOTP)
+		// Noto'g'ri kod - qayta yuborish tugmasi bilan
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(i18n.Get(user.LanguageCode).ResendOTP, CallbackResendOTP),
+			),
+		)
+		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.Get(user.LanguageCode).InvalidOTP)
+		msg.ParseMode = tgbotapi.ModeHTML
+		msg.ReplyMarkup = keyboard
+		h.bot.Send(msg)
 		return
 	}
 
@@ -316,9 +326,9 @@ func (h *Handler) handleOTPInput(ctx context.Context, msg *tgbotapi.Message, use
 	successMsg := fmt.Sprintf(i18n.Get(user.LanguageCode).RegistrationDone,
 		finalUser.FirstName, finalUser.LastName, finalUser.Region,
 		finalUser.District, finalUser.School, finalUser.Grade, finalUser.Phone)
-	h.sendMessageHTML(msg.Chat.ID, successMsg)
+	h.sendMessageHTML(message.Chat.ID, successMsg)
 
-	h.sendMainMenu(msg.Chat.ID, user.LanguageCode)
+	h.sendMainMenu(message.Chat.ID, user.LanguageCode)
 }
 
 func (h *Handler) handleResendOTP(ctx context.Context, msg *tgbotapi.Message) {
@@ -327,9 +337,46 @@ func (h *Handler) handleResendOTP(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	h.otpService.GenerateAndSendOTP(ctx, user.ID, user.Phone)
+	if err := h.otpService.GenerateAndSendOTP(ctx, user.ID, user.Phone); err != nil {
+		h.logger.Error("❌ Failed to resend OTP", slog.Any("error", err))
+		h.sendMessage(msg.Chat.ID, i18n.Get(user.LanguageCode).Error)
+		return
+	}
+
 	maskedPhone := user.Phone[:6] + "****" + user.Phone[len(user.Phone)-2:]
-	h.sendMessageHTML(msg.Chat.ID, fmt.Sprintf(i18n.Get(user.LanguageCode).OTPSent, maskedPhone))
+	h.sendOTPMessage(msg.Chat.ID, user.LanguageCode, maskedPhone)
+}
+
+func (h *Handler) handleResendOTPCallback(ctx context.Context, chatID int64, userID int64) {
+	user, _ := h.userService.GetUser(ctx, userID)
+	if user == nil || user.Phone == "" || user.State != domain.StateWaitOTP {
+		return
+	}
+
+	if err := h.otpService.GenerateAndSendOTP(ctx, user.ID, user.Phone); err != nil {
+		h.logger.Error("❌ Failed to resend OTP", slog.Any("error", err))
+		h.sendMessage(chatID, i18n.Get(user.LanguageCode).Error)
+		return
+	}
+
+	maskedPhone := user.Phone[:6] + "****" + user.Phone[len(user.Phone)-2:]
+	h.sendOTPMessage(chatID, user.LanguageCode, maskedPhone)
+}
+
+func (h *Handler) sendOTPMessage(chatID int64, langCode string, maskedPhone string) {
+	msgs := i18n.Get(langCode)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(msgs.ResendOTP, CallbackResendOTP),
+		),
+	)
+
+	text := fmt.Sprintf(msgs.OTPSent, maskedPhone) + "\n\n" + msgs.AskOTP
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = tgbotapi.ModeHTML
+	msg.ReplyMarkup = keyboard
+	h.bot.Send(msg)
 }
 
 func (h *Handler) handleProfile(ctx context.Context, msg *tgbotapi.Message) {
@@ -422,11 +469,8 @@ func (h *Handler) handleCallback(ctx context.Context, callback *tgbotapi.Callbac
 			h.handleStartFromCallback(ctx, callback)
 		}
 
-	case CallbackLogin:
-		h.sendMessage(callback.Message.Chat.ID, "🔑 Akkauntga kirish funksiyasi tez orada...")
-
-	case CallbackRegister:
-		h.sendMessage(callback.Message.Chat.ID, "📝 Akkaunt yaratish funksiyasi tez orada...")
+	case CallbackResendOTP:
+		h.handleResendOTPCallback(ctx, callback.Message.Chat.ID, callback.From.ID)
 
 	case CallbackAdminStats:
 		h.sendAdminPanel(ctx, callback.Message.Chat.ID)
