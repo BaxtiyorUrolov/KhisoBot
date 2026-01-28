@@ -22,6 +22,7 @@ type Messages struct {
 	NotRegistered     string
 	BtnLogin          string
 	BtnRegister       string
+	BtnShareContact   string
 	MustSubscribe     string
 	BtnCheckSub       string
 	SubscribeSuccess  string
@@ -36,7 +37,7 @@ var messages = map[string]Messages{
 		InvalidLocation:   "❌ Noto'g'ri format.\n\nQuyidagi formatda kiriting:\n<i>Viloyat, Tuman, Maktab</i>\n\nMisol: Toshkent, Yunusobod, 56-maktab",
 		AskGrade:          "🎓 Nechanchi sinfda o'qiysiz?\n\n<i>1 dan 11 gacha raqam kiriting</i>",
 		InvalidGrade:      "❌ Noto'g'ri sinf raqami.\n\n<i>1 dan 11 gacha raqam kiriting</i>",
-		AskPhone:          "📱 Telefon raqamingizni kiriting:\n\n<i>Misol: 998901234567</i>",
+		AskPhone:          "📱 Telefon raqamingizni kiriting yoki pastdagi tugmani bosing:\n\n<i>Misol: 998901234567</i>",
 		AskOTP:            "🔐 Telefon raqamingizga yuborilgan tasdiqlash kodini kiriting:",
 		InvalidPhone:      "❌ Telefon raqam noto'g'ri formatda.\n\n<i>Misol: 998901234567</i>",
 		InvalidOTP:        "❌ Tasdiqlash kodi noto'g'ri. Qaytadan urinib ko'ring.",
@@ -49,6 +50,7 @@ var messages = map[string]Messages{
 		NotRegistered:     "❌ Siz hali ro'yxatdan o'tmagansiz. /start bosing.",
 		BtnLogin:          "🔑 Akkauntga kirish",
 		BtnRegister:       "📝 Akkaunt yaratish",
+		BtnShareContact:   "📱 Telefon raqamni ulashish",
 		MustSubscribe:     "📢 Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:",
 		BtnCheckSub:       "✅ Obunani tekshirish",
 		SubscribeSuccess:  "✅ Rahmat! Endi botdan foydalanishingiz mumkin.",
@@ -61,7 +63,7 @@ var messages = map[string]Messages{
 		InvalidLocation:   "❌ Неверный формат.\n\nВведите в формате:\n<i>Область, Район, Школа</i>\n\nПример: Ташкент, Юнусабад, школа 56",
 		AskGrade:          "🎓 В каком классе вы учитесь?\n\n<i>Введите число от 1 до 11</i>",
 		InvalidGrade:      "❌ Неверный номер класса.\n\n<i>Введите число от 1 до 11</i>",
-		AskPhone:          "📱 Введите номер телефона:\n\n<i>Пример: 998901234567</i>",
+		AskPhone:          "📱 Введите номер телефона или нажмите кнопку ниже:\n\n<i>Пример: 998901234567</i>",
 		AskOTP:            "🔐 Введите код подтверждения, отправленный на ваш телефон:",
 		InvalidPhone:      "❌ Неверный формат номера.\n\n<i>Пример: 998901234567</i>",
 		InvalidOTP:        "❌ Неверный код подтверждения. Попробуйте еще раз.",
@@ -74,6 +76,7 @@ var messages = map[string]Messages{
 		NotRegistered:     "❌ Вы еще не зарегистрированы. Нажмите /start.",
 		BtnLogin:          "🔑 Войти в аккаунт",
 		BtnRegister:       "📝 Создать аккаунт",
+		BtnShareContact:   "📱 Поделиться номером",
 		MustSubscribe:     "📢 Для использования бота подпишитесь на следующие каналы:",
 		BtnCheckSub:       "✅ Проверить подписку",
 		SubscribeSuccess:  "✅ Спасибо! Теперь вы можете использовать бота.",
@@ -86,7 +89,7 @@ var messages = map[string]Messages{
 		InvalidLocation:   "❌ Invalid format.\n\nPlease enter in format:\n<i>Region, District, School</i>\n\nExample: Tashkent, Yunusabad, School 56",
 		AskGrade:          "🎓 What grade are you in?\n\n<i>Enter a number from 1 to 11</i>",
 		InvalidGrade:      "❌ Invalid grade number.\n\n<i>Enter a number from 1 to 11</i>",
-		AskPhone:          "📱 Enter your phone number:\n\n<i>Example: 998901234567</i>",
+		AskPhone:          "📱 Enter your phone number or tap the button below:\n\n<i>Example: 998901234567</i>",
 		AskOTP:            "🔐 Enter the verification code sent to your phone:",
 		InvalidPhone:      "❌ Invalid phone number format.\n\n<i>Example: 998901234567</i>",
 		InvalidOTP:        "❌ Invalid verification code. Please try again.",
@@ -99,6 +102,7 @@ var messages = map[string]Messages{
 		NotRegistered:     "❌ You are not registered yet. Press /start.",
 		BtnLogin:          "🔑 Login to account",
 		BtnRegister:       "📝 Create account",
+		BtnShareContact:   "📱 Share phone number",
 		MustSubscribe:     "📢 To use the bot, please subscribe to the following channels:",
 		BtnCheckSub:       "✅ Check subscription",
 		SubscribeSuccess:  "✅ Thank you! You can now use the bot.",

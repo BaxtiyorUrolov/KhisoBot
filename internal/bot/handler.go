@@ -180,6 +180,12 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
+	// Contact yuborilgan bo'lsa (telefon raqam ulashish)
+	if msg.Contact != nil && user.State == domain.StateWaitPhone {
+		h.handleContact(ctx, msg, user)
+		return
+	}
+
 	text := strings.TrimSpace(msg.Text)
 	if text == "" {
 		return
@@ -199,6 +205,46 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	case domain.StateRegistered:
 		h.sendMainMenu(msg.Chat.ID, user.LanguageCode)
 	}
+}
+
+func (h *Handler) handleContact(ctx context.Context, msg *tgbotapi.Message, user *domain.User) {
+	// Kontaktdan telefon raqamni olish
+	phone := msg.Contact.PhoneNumber
+	phone = strings.NewReplacer(" ", "", "+", "", "-", "", "(", "", ")", "").Replace(phone)
+
+	// Agar 998 bilan boshlanmasa, qo'shish
+	if !strings.HasPrefix(phone, "998") && len(phone) == 9 {
+		phone = "998" + phone
+	}
+
+	if !phoneRegex.MatchString(phone) {
+		h.sendMessageHTML(msg.Chat.ID, i18n.Get(user.LanguageCode).InvalidPhone)
+		return
+	}
+
+	if err := h.userService.UpdatePhone(ctx, user.TelegramID, phone); err != nil {
+		h.sendMessage(msg.Chat.ID, i18n.Get(user.LanguageCode).Error)
+		return
+	}
+
+	updatedUser, _ := h.userService.GetUser(ctx, user.TelegramID)
+
+	if err := h.otpService.GenerateAndSendOTP(ctx, updatedUser.ID, phone); err != nil {
+		h.logger.Error("❌ Failed to send OTP", slog.Any("error", err))
+		h.sendMessage(msg.Chat.ID, i18n.Get(user.LanguageCode).Error)
+		return
+	}
+
+	h.userService.UpdateUserState(ctx, user.TelegramID, domain.StateWaitOTP)
+
+	// Keyboard'ni olib tashlash
+	removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+	msgRemove := tgbotapi.NewMessage(msg.Chat.ID, "✅")
+	msgRemove.ReplyMarkup = removeKeyboard
+	h.bot.Send(msgRemove)
+
+	maskedPhone := phone[:6] + "****" + phone[len(phone)-2:]
+	h.sendOTPMessage(msg.Chat.ID, user.LanguageCode, maskedPhone)
 }
 
 func (h *Handler) handleFullName(ctx context.Context, msg *tgbotapi.Message, user *domain.User, text string) {
@@ -268,7 +314,26 @@ func (h *Handler) handleGrade(ctx context.Context, msg *tgbotapi.Message, user *
 		return
 	}
 
-	h.sendMessageHTML(msg.Chat.ID, i18n.Get(user.LanguageCode).AskPhone)
+	// Telefon so'rash - contact button bilan
+	h.sendPhoneRequest(msg.Chat.ID, user.LanguageCode)
+}
+
+func (h *Handler) sendPhoneRequest(chatID int64, langCode string) {
+	msgs := i18n.Get(langCode)
+
+	// ReplyKeyboard bilan "Share Contact" tugmasi
+	keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButtonContact("📱 Telefon raqamni ulashish"),
+		),
+	)
+	keyboard.OneTimeKeyboard = true
+	keyboard.ResizeKeyboard = true
+
+	msg := tgbotapi.NewMessage(chatID, msgs.AskPhone)
+	msg.ParseMode = tgbotapi.ModeHTML
+	msg.ReplyMarkup = keyboard
+	h.bot.Send(msg)
 }
 
 func (h *Handler) handlePhone(ctx context.Context, msg *tgbotapi.Message, user *domain.User, text string) {
@@ -293,6 +358,12 @@ func (h *Handler) handlePhone(ctx context.Context, msg *tgbotapi.Message, user *
 	}
 
 	h.userService.UpdateUserState(ctx, user.TelegramID, domain.StateWaitOTP)
+
+	// Keyboard'ni olib tashlash
+	removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+	msgRemove := tgbotapi.NewMessage(msg.Chat.ID, "✅")
+	msgRemove.ReplyMarkup = removeKeyboard
+	h.bot.Send(msgRemove)
 
 	maskedPhone := phone[:6] + "****" + phone[len(phone)-2:]
 	h.sendOTPMessage(msg.Chat.ID, user.LanguageCode, maskedPhone)
