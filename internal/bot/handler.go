@@ -11,11 +11,12 @@ import (
 	"strings"
 	"sync"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/xuri/excelize/v2"
 	"khisobot/internal/domain"
 	"khisobot/internal/service"
 	"khisobot/pkg/i18n"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/xuri/excelize/v2"
 )
 
 var phoneRegex = regexp.MustCompile(`^998[0-9]{9}$`)
@@ -31,11 +32,6 @@ const (
 	CallbackAdminExport = "admin_export"
 	CallbackAdminBack   = "admin_back"
 	CallbackDelChannel  = "del_ch_"
-)
-
-const (
-	MandatoryStaticChannelUsername = "khiso"
-	MandatoryStaticChannelURL      = "https://t.me/khiso"
 )
 
 type Handler struct {
@@ -162,11 +158,6 @@ func (h *Handler) checkSubscription(ctx context.Context, userID int64, chatID in
 
 	// Keyboard: STATIK kanal (TEKSHIRILMAYDI) + DB dan yetishmayotganlar (TEKSHIRILADI)
 	var rows [][]tgbotapi.InlineKeyboardButton
-
-	// Statik kanalni doim ko'rsatamiz, lekin notSubscribedga kiritmaymiz
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonURL("📢 @"+MandatoryStaticChannelUsername, MandatoryStaticChannelURL),
-	))
 
 	// DB dan topilgan obuna bo'lmagan kanallar
 	for _, ch := range notSubscribed {
