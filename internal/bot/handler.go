@@ -669,18 +669,18 @@ func (h *Handler) exportToExcel(ctx context.Context, chatID int64) {
 func (h *Handler) sendMainMenu(chatID int64, langCode string) {
 	msgs := i18n.Get(langCode)
 
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(msgs.BtnLogin, "https://khiso.uz/login"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(msgs.BtnRegister, "https://khiso.uz/register"),
-		),
-	)
+	//keyboard := tgbotapi.NewInlineKeyboardMarkup(
+	//	tgbotapi.NewInlineKeyboardRow(
+	//		tgbotapi.NewInlineKeyboardButtonURL(msgs.BtnLogin, "https://khiso.uz/login"),
+	//	),
+	//	tgbotapi.NewInlineKeyboardRow(
+	//		tgbotapi.NewInlineKeyboardButtonURL(msgs.BtnRegister, "https://khiso.uz/register"),
+	//	),
+	//)
 
 	msg := tgbotapi.NewMessage(chatID, msgs.MainMenu)
 	msg.ParseMode = tgbotapi.ModeHTML
-	msg.ReplyMarkup = keyboard
+	//msg.ReplyMarkup = keyboard
 	msg.DisableWebPagePreview = true
 	h.bot.Send(msg)
 }
